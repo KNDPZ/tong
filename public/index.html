@@ -1844,8 +1844,15 @@ function render(){
   if(typeof hubStatus==="function")hubStatus("playing");
   if(view.type==="lobby"){document.body.classList.remove("in-game");renderLobby(view);return;}
   document.body.classList.add("in-game");
+  // A new deal just started (previous round was over, this one isn't):
+  // wipe last round's local arrangement so old groups can't carry over —
+  // card IDs like "7S" repeat across deals, so reconcile() alone can't tell.
+  const _ov=!!(view.round&&view.round.over);
+  if(_prevRoundOver&&!_ov){groups=[];looseOrder=[];armedId=null;discardPick=null;justDrawn=null;prevHandIds=[];}
+  _prevRoundOver=_ov;
   hidePre();renderGame(view);
 }
+let _prevRoundOver=false;
 function renderLobby(v){
   showPre("p-lobby");stopTimer();
   ["hRoom","hPot","hMoney","leaveBtn","skinBtn"].forEach(id=>$(id).style.display="none");
