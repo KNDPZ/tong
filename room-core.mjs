@@ -401,6 +401,8 @@ export function lobbyMeta(room) {
     players: room.capacity - open,
     open,
     inProgress: live,
+    // names of everyone seated (shown in the lobby's table list)
+    names: room.seats.filter((t) => t).map((t) => room.players[t].name),
   };
 }
 
