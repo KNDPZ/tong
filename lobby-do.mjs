@@ -7,7 +7,7 @@
 // ============================================================================
 
 const CHAT_MAX = 50;
-const ROOM_STALE_MS = 600000;
+const ROOM_STALE_MS = 120000;   // rooms republish every 45s; 2 missed beats -> pruned
 export const CHAT_TTL_MS = 15 * 60 * 1000; // world-chat messages vanish after 15 minutes
 
 export function normName(n) { return String(n || "").trim().toLowerCase(); }

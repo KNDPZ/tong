@@ -1412,6 +1412,8 @@
   </div>
   <div id="p-create" style="display:none">
     <h2>Create a room</h2>
+    <label>Room name <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional · max 10 letters/numbers)</span></label>
+    <input id="roomNameInput" type="text" maxlength="10" placeholder="e.g. Barkada" autocomplete="off" />
     <label>Players</label>
     <div class="seg" id="capSeg"><button data-cap="3" class="sel">3 players</button><button data-cap="2">1v1</button></div>
     <label style="margin-top:14px"><input type="checkbox" id="privChk" style="width:auto;margin-right:6px">Private (need password to join by code)</label>
@@ -1667,10 +1669,12 @@ $("capSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{chosenCap=+b.da
 $("privChk").onchange=e=>$("pwWrap").style.display=e.target.checked?"":"none";
 $("createGo").onclick=async()=>{$("createErr").textContent="";const priv=$("privChk").checked;const pw=priv?$("pwInput").value:"";
   if(priv&&!pw){$("createErr").textContent="Set a password or uncheck private.";return;}
-  try{const r=await post("/api/create",{name:me.name,token:me.token,capacity:chosenCap,private:priv,password:pw});
+  const rn=$("roomNameInput").value.replace(/[^A-Za-z0-9 ]/g,"").replace(/\s+/g," ").trim().slice(0,10);
+  try{const r=await post("/api/create",{name:me.name,token:me.token,capacity:chosenCap,private:priv,password:pw,roomName:rn});
     if(r.error){$("createErr").textContent=r.error;return;}
     room={id:r.roomId,invite:r.invite,capacity:chosenCap,isHost:true};connectWS();
   }catch(e){$("createErr").textContent="Couldn't reach the server.";}};
+$("roomNameInput").addEventListener("input",()=>{const i=$("roomNameInput");const v=i.value.replace(/[^A-Za-z0-9 ]/g,"");if(v!==i.value)i.value=v;});
 $("joinGo").onclick=()=>{const code=$("joinCode").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");if(!code){$("joinErr").textContent="Enter a room code.";return;}doJoin(code,$("joinPw").value,"");};
 async function doJoin(code,password,invite){
   try{const r=await post("/api/join",{roomId:code,token:me.token,name:me.name,password,invite});
@@ -1708,7 +1712,8 @@ function renderRooms(rooms){
   rooms.forEach(rm=>{const type=rm.type||(rm.capacity===2?"1v1":"1v2");const seated=rm.players!=null?rm.players:(rm.capacity-rm.open);
     const d=document.createElement("div");d.className="lb-room";
     const names=(rm.names&&rm.names.length)?rm.names.map(n=>esc(n)).join(", "):"";
-    d.innerHTML=`<div class="badge">${type==="1v1"?"1·1":"1·2"}</div><div class="info"><b>${type} table</b>${names?`<div class="rm-names">👥 ${names}</div>`:""}<div>${rm.open} open seat${rm.open===1?"":"s"} · ${seated} seated${rm.inProgress?" · in play":""}</div></div>`;
+    const title=rm.title?esc(rm.title):type+" table";
+    d.innerHTML=`<div class="badge">${type==="1v1"?"1·1":"1·2"}</div><div class="info"><b>${title}</b>${names?`<div class="rm-names">👥 ${names}</div>`:""}<div>${rm.title?type+" · ":""}${rm.open} open seat${rm.open===1?"":"s"} · ${seated} seated${rm.inProgress?" · in play":""}</div></div>`;
     const j=document.createElement("button");j.className="info";j.textContent="Join";j.onclick=()=>doJoin(rm.roomId,"","");
     d.appendChild(j);el.appendChild(d);});
 }
@@ -1926,6 +1931,10 @@ function render(){
 let _prevRoundOver=false;
 function renderLobby(v){
   room.priv=!!v.isPrivate;if(v.capacity)room.capacity=v.capacity;
+  const wrh=document.querySelector("#p-lobby h2");
+  if(wrh)wrh.textContent=v.roomName?("Waiting room · "+v.roomName):"Waiting room";
+  const wph=document.querySelector("#lbWaitPanel .lb-panel-head");
+  if(wph)wph.textContent=v.roomName?("Your room · "+v.roomName):"Your room";
   dockWait();stopTimer();
   ["hRoom","hPot","hMoney","leaveBtn","skinBtn"].forEach(id=>$(id).style.display="none");
   $("lobbyCode").textContent=v.roomId;room.isHost=v.youAreHost;if(v.invite)room.invite=v.invite;
@@ -2519,6 +2528,9 @@ function leaveThenJoin(roomId,invite){
   if(view&&room.id){try{send({t:"leave"});}catch(e){}}  // free the old seat first
   doJoin(roomId,"",invite);
 }
+
+/* keepalive: lets the server tell a healthy idle room from a ghost one */
+setInterval(()=>{try{if(ws&&ws.readyState===1&&view)send({t:"ping"});}catch(e){}},25000);
 
 boot();
 </script>
