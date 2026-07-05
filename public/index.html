@@ -280,6 +280,20 @@
   .rcard.red{color:var(--red);} .rcard.black{color:#26221a;}.rcard.meldc{opacity:.4;}
   .rempty{font-size:12px;color:#6f9684;}
   .drag-clone{position:fixed;z-index:999;pointer-events:none;transform:translate(-50%,-50%) rotate(3deg);filter:drop-shadow(0 10px 16px rgba(0,0,0,.65));}
+  .drag-clone.group-clone{display:flex;transform:translate(-50%,-50%) rotate(2deg);}
+  .drag-clone.group-clone .card{margin-left:-34px;}
+  .drag-clone.group-clone .card:first-child{margin-left:0;}
+  body.dragging{overflow:hidden!important;touch-action:none;}
+  body.dragging .table-scroll,body.dragging .hand,body.dragging .tray{overflow:hidden!important;}
+  .touchui .group{touch-action:pan-x;}
+  .touchui .group .gmeta{display:none;}
+  .touchui .group.collapsed .cards .card{margin-left:-38px;pointer-events:none;}
+  .touchui .group.collapsed .cards .card:first-child{margin-left:0;}
+  .touchui .group.collapsed{padding:6px;}
+  .touchui .group.expanded{box-shadow:inset 0 0 0 2px var(--gold),0 0 18px rgba(246,183,60,.45);}
+  .touchui .group.expanded .cards .card{margin-left:-18px;box-shadow:0 0 0 2px var(--gold-dim),0 3px 8px rgba(0,0,0,.5);}
+  .touchui .group.expanded .cards .card:first-child{margin-left:0;}
+  .pile-target.felt-discard{box-shadow:0 0 0 3px var(--danger),0 0 18px rgba(228,87,77,.6);}
   .toast{position:fixed;left:50%;bottom:calc(18px + var(--sab));transform:translateX(-50%);background:#b03a31;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:950;max-width:92vw;text-align:center;}
   .toast.show{opacity:1;}
 
@@ -313,11 +327,18 @@
     body.in-game .left,body.in-game .right{display:none;}
     body.in-game #chatFab{display:flex;}
     body.in-game #mTimer.on{display:flex;}
-    .hand{justify-content:flex-start;overflow-x:auto;padding:12px 10px 16px;min-height:100px;}
-    .hand .card{margin-left:-24px;}
+    .hand{justify-content:flex-start;overflow-x:auto;padding:16px 10px 14px;min-height:112px;}
+    .hand .card{width:60px;height:86px;margin-left:-36px;}
+    .hand .card .pip{font-size:24px;}
+    .hand .card .corner{font-size:14px;}
     .hand .card:first-child{margin-left:0;}
-    .hand .card.armed{z-index:5;}
-    .dock{position:sticky;bottom:calc(6px + var(--sab));z-index:40;}
+    .hand .card.armed{z-index:5;transform:translateY(-16px);}
+    .tray{flex-wrap:nowrap;overflow-x:auto;gap:9px;padding:9px;scrollbar-width:none;}
+    .tray::-webkit-scrollbar{display:none;}
+    .tray .group .card{width:56px;height:80px;}
+    .newgroup{min-width:64px;min-height:56px;font-size:10px;flex:0 0 auto;}
+    .table-rail{margin-bottom:112px;}
+    .dock{position:sticky;bottom:calc(6px + var(--sab));z-index:40;margin-top:-102px;}
     .controls button{padding:11px 13px;font-size:14px;}
     .modal{padding:18px;border-radius:18px;}
   }
@@ -1326,7 +1347,7 @@
 
     <section class="center">
       <div class="table-scroll">
-        <div class="table-rail"><div class="felt">
+        <div class="table-rail"><div class="felt" data-zone="felt">
           <div class="opponents" id="opponents"></div>
           <div class="pot-wrap"><span class="potchip" id="potChip">Pot —</span></div>
           <div class="center-piles">
@@ -1342,7 +1363,7 @@
               <button class="ghost small" id="viewDiscardBtn" style="margin-top:2px;">View pile</button>
             </div>
           </div>
-          <div class="myseat" id="myseat">
+          <div class="myseat" id="myseat" data-zone="myseat">
             <div class="myseat-head">
               <h2><span id="myName">You</span> <span class="badges" id="myBadges"></span></h2>
               <div class="myseat-tools"><span class="pill" id="myPoints">Counts: 0 pts</span><button class="ghost small" id="sortBtn" title="Sort your ungrouped cards">⇅ Sort</button></div>
@@ -1755,6 +1776,8 @@ $("lbHowto").onclick=()=>$("rulesScrim").classList.add("show");
 $("lbChangeName").onclick=e=>{e.preventDefault();showPre("p-name");$("nameInput").value=me.name;$("nameInput").focus();};
 
 /* ---------- global hub: presence + world chat ---------- */
+const IS_TOUCH=!!(window.matchMedia&&matchMedia("(pointer:coarse)").matches);
+if(IS_TOUCH)document.body.classList.add("touchui");
 let hub=null,hubTimer=null,hubStatusVal="lobby",hubLastSent="lobby",onlineUsers=[],wcLines=[];
 function hubUrl(){return (location.protocol==="https:"?"wss://":"ws://")+location.host+"/hub";}
 function connectHub(){
@@ -2080,9 +2103,11 @@ function renderGame(v){
     mh.appendChild(el);});
 
   const tray=$("myTray");tray.innerHTML="";
+  if(expandedGroup!=null&&expandedGroup>=groups.length)expandedGroup=null;
   groups.forEach((g,gi)=>{const cards=g.map(id=>map.get(id)).filter(Boolean);
     const valid=cards.length>=3&&isValidMeld(cards);
     const gd=document.createElement("div");gd.className="group"+(valid?" valid":"");gd.dataset.zone="group";gd.dataset.group=String(gi);
+    if(IS_TOUCH&&!discardPick){gd.classList.add(expandedGroup===gi?"expanded":"collapsed");if(expandedGroup!==gi)attachGroupPointer(gd,gi,valid);}
     const cc=document.createElement("div");cc.className="cards";
     cards.forEach(c=>{const el=cardEl(c);el.dataset.cardid=cardId(c);
       if(discardPick){el.classList.add("candidate");if(discardPick.chosen.has(cardId(c)))el.classList.add("picksel");el.onclick=()=>togglePick(cardId(c));}
@@ -2097,6 +2122,7 @@ function renderGame(v){
   const ng=document.createElement("div");ng.className="newgroup";ng.dataset.zone="newgroup";ng.textContent="drag here for a new group";tray.appendChild(ng);
 
   renderControls(v,myTurn);
+  if(IS_TOUCH&&!_seatScrolled){_seatScrolled=true;setTimeout(()=>{try{window.scrollTo(0,document.body.scrollHeight);}catch(e){}},80);}
   animateDiff(v);
   setTimer(r.over?null:v.turn);
   renderCallModal(v);
@@ -2178,9 +2204,9 @@ function attachPointer(el,id){
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp,{once:true});});
 }
 function onMove(e){if(!drag)return;const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
-  if(!drag.moved&&Math.hypot(dx,dy)>7){drag.moved=true;const card=cardById(drag.id);const cl=cardEl(card);cl.classList.add("drag-clone");document.body.appendChild(cl);drag.clone=cl;drag.origin.style.visibility="hidden";}
+  if(!drag.moved&&Math.hypot(dx,dy)>7){drag.moved=true;document.body.classList.add("dragging");const card=cardById(drag.id);const cl=cardEl(card);cl.classList.add("drag-clone");document.body.appendChild(cl);drag.clone=cl;drag.origin.style.visibility="hidden";}
   if(drag.moved){drag.clone.style.left=e.clientX+"px";drag.clone.style.top=e.clientY+"px";highlightZone(e.clientX,e.clientY);}}
-function onUp(e){window.removeEventListener("pointermove",onMove);if(!drag)return;
+function onUp(e){window.removeEventListener("pointermove",onMove);document.body.classList.remove("dragging");if(!drag)return;
   if(drag.moved){clearZone();if(drag.clone)drag.clone.remove();if(drag.origin)drag.origin.style.visibility="";handleDrop(drag.id,e.clientX,e.clientY);}else tapCard(drag.id);
   drag=null;}
 function zoneUnder(x,y){const el=document.elementFromPoint(x,y);return el?el.closest("[data-zone]"):null;}
@@ -2188,12 +2214,21 @@ function meldFromZone(z){const o=+z.dataset.owner,mi=+z.dataset.meldidx;const ms
 function highlightZone(x,y){clearZone();const z=zoneUnder(x,y);if(!z)return;const r=view.round;const myTurn=!r.over&&r.currentIdx===(r.you?r.you.idx:-1);
   if(z.dataset.zone==="discard"){if(myTurn&&r.phase==="play")z.classList.add("dropzone");}
   else if(z.dataset.zone==="meld"){const c=drag?cardById(drag.id):null;const meld=meldFromZone(z);if(myTurn&&r.phase==="play"&&c&&meld&&canAddToMeld(meld,c))z.classList.add("dropzone");}
+  else if(z.dataset.zone==="felt"){if(IS_TOUCH&&myTurn&&r.phase==="play"){const dt=$("discardTarget");if(dt)dt.classList.add("felt-discard");}}
+  else if(z.dataset.zone==="myseat"){}
   else z.classList.add("dropzone");}
-function clearZone(){document.querySelectorAll(".dropzone").forEach(e=>e.classList.remove("dropzone"));}
+function clearZone(){document.querySelectorAll(".dropzone,.felt-discard").forEach(e=>e.classList.remove("dropzone","felt-discard"));}
 function insertIndexIn(container,x,skipId){const cards=[...container.querySelectorAll(".card")].filter(el=>el.dataset.cardid!==skipId);
   for(let i=0;i<cards.length;i++){const rc=cards[i].getBoundingClientRect();if(x<rc.left+rc.width/2)return i;}return cards.length;}
 function handleDrop(id,x,y){const z=zoneUnder(x,y);if(!z){render();return;}const t=z.dataset.zone;const r=view.round;const myTurn=!r.over&&r.currentIdx===(r.you?r.you.idx:-1);
   if(t==="discard"){if(myTurn&&r.phase==="play")doDiscard(id);else render();return;}
+  if(t==="felt"){
+    // touch shortcut: dropping a card on the open table (not on any meld) discards it
+    if(IS_TOUCH&&myTurn&&r.phase==="play"){doDiscard(id);return;}
+    if(IS_TOUCH&&myTurn&&r.phase==="draw"){toast("Draw a card first, then discard.");}
+    else if(IS_TOUCH&&!myTurn){toast("You can discard on your turn.");}
+    render();return;}
+  if(t==="myseat"){render();return;}
   if(t==="meld"){const meld=meldFromZone(z);const c=cardById(id);
     if(myTurn&&r.phase==="play"&&c&&meld&&canAddToMeld(meld,c))sapawCard(id,+z.dataset.owner,+z.dataset.meldidx,meld);
     else render();
@@ -2417,7 +2452,7 @@ renderOver=function(v){
   else if(!_overSeen){_overSeen=true;try{_recordRound(v);}catch(e){}}
   return _renderOver(v);};
 const _enterLobby=enterLobby;
-enterLobby=function(){_enterLobby();renderStats();undockWait();_lastTurnIdx=null;_overSeen=false;};
+enterLobby=function(){_enterLobby();renderStats();undockWait();_lastTurnIdx=null;_overSeen=false;_seatScrolled=false;expandedGroup=null;};
 renderStats();
 
 /* ---- sort your hand (client-side ordering only) ---- */
@@ -2613,6 +2648,73 @@ if(_mSeg)_mSeg.querySelectorAll("button").forEach(b=>{
     if(world){renderWorldChat(true);}
   };
 });
+
+/* ============================================================
+   Touch hand & groups — groups sit collapsed "in hand" below the
+   fan; tap opens one so its cards can be moved individually; drag
+   a collapsed group onto the table to lay it as a meld.
+   ============================================================ */
+let expandedGroup=null;
+let gdrag=null;
+let _seatScrolled=false;
+function attachGroupPointer(gd,gi,valid){
+  gd.addEventListener("pointerdown",e=>{
+    if(view&&view.round&&view.round.over)return;
+    gdrag={gi,valid,startX:e.clientX,startY:e.clientY,moved:false,clone:null,origin:gd};
+    window.addEventListener("pointermove",onGroupMove);
+    window.addEventListener("pointerup",onGroupUp,{once:true});
+  });
+}
+function onGroupMove(e){
+  if(!gdrag)return;
+  const dx=e.clientX-gdrag.startX,dy=e.clientY-gdrag.startY;
+  if(!gdrag.moved){
+    if(Math.hypot(dx,dy)<=10)return;
+    // horizontal swipes scroll the tray (touch-action:pan-x); only a clear
+    // vertical pull starts a group drag
+    if(Math.abs(dx)>Math.abs(dy)){gdrag=null;window.removeEventListener("pointermove",onGroupMove);return;}
+    gdrag.moved=true;document.body.classList.add("dragging");
+    const cl=gdrag.origin.querySelector(".cards").cloneNode(true);
+    cl.className="drag-clone group-clone";
+    cl.querySelectorAll(".card").forEach(c=>{c.style.visibility="";c.classList.remove("armed","justdrawn");});
+    document.body.appendChild(cl);gdrag.clone=cl;
+    gdrag.origin.style.visibility="hidden";
+  }
+  gdrag.clone.style.left=e.clientX+"px";gdrag.clone.style.top=e.clientY+"px";
+  clearZone();
+  const z=zoneUnder(e.clientX,e.clientY);
+  if(z&&(z.dataset.zone==="felt"||z.dataset.zone==="discard")&&gdrag.valid)z.classList.add("dropzone");
+}
+function onGroupUp(e){
+  window.removeEventListener("pointermove",onGroupMove);
+  document.body.classList.remove("dragging");
+  if(!gdrag)return;
+  const g=gdrag;gdrag=null;
+  if(!g.moved){ // plain tap: open the group so its cards can be moved one by one
+    expandedGroup=g.gi;render();return;
+  }
+  clearZone();
+  if(g.clone)g.clone.remove();
+  if(g.origin)g.origin.style.visibility="";
+  const z=zoneUnder(e.clientX,e.clientY);
+  const zone=z?z.dataset.zone:null;
+  // dropped anywhere on the table (felt / piles / a meld row) -> try to lay it
+  if(zone==="felt"||zone==="discard"||zone==="meld"||zone==="draw"){
+    const r=view.round,myTurn=!r.over&&r.currentIdx===(r.you?r.you.idx:-1);
+    if(!g.valid){toast("Not a valid meld yet — needs 3+ matching cards.");render();return;}
+    if(!(myTurn&&r.phase==="play")){toast(myTurn?"Draw a card first, then lay it.":"You can lay melds on your turn.");render();return;}
+    try{sfx("meld");}catch(err){}
+    layGroup(g.gi);expandedGroup=null;return;
+  }
+  render();
+}
+// tapping anywhere outside an open group closes it again
+window.addEventListener("pointerdown",e=>{
+  if(!IS_TOUCH||expandedGroup==null)return;
+  if(e.target.closest&&e.target.closest(".group.expanded"))return;
+  expandedGroup=null;
+  if(view&&view.round)render();
+},true);
 
 boot();
 </script>
