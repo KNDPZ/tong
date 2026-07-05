@@ -71,7 +71,19 @@ export default {
     }
 
     // static client (Workers Static Assets binding)
-    if (env.ASSETS) return env.ASSETS.fetch(request);
+    if (env.ASSETS) {
+      const res = await env.ASSETS.fetch(request);
+      // HTML must always revalidate: phones cache the shell aggressively, which
+      // left players on stale builds after deploys. The ETag makes this cheap —
+      // an unchanged page costs a 304, a new deploy is picked up immediately.
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("text/html")) {
+        const h = new Headers(res.headers);
+        h.set("cache-control", "no-cache, must-revalidate");
+        return new Response(res.body, { status: res.status, headers: h });
+      }
+      return res;
+    }
     return new Response("Tong-its API. Deploy the client to /public.", { status: 200 });
   },
 };

@@ -6,6 +6,9 @@ compatibility_date = "2025-09-01"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+# The worker intercepts HTML requests to force cache revalidation (stale-build
+# fix for phones). All other assets are still served directly = free/unmetered.
+run_worker_first = ["/", "/index.html"]
 
 # One Durable Object class per room. SQLite-backed = available on the FREE plan.
 [[durable_objects.bindings]]
